@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { getStockQuote } from "./finnhubService";
 
@@ -141,6 +140,14 @@ export const updatePortfolioHolding = async (
   price: number
 ): Promise<boolean> => {
   try {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('Error getting authenticated user:', userError);
+      return false;
+    }
+
     // First, check if the stock exists in our database
     let { data: stock, error: stockError } = await supabase
       .from('stocks')
@@ -184,6 +191,7 @@ export const updatePortfolioHolding = async (
       .from('portfolio_holdings')
       .select('*')
       .eq('stock_id', stock.id)
+      .eq('user_id', user.id)
       .single();
     
     if (!holdingError && existingHolding) {
@@ -198,7 +206,8 @@ export const updatePortfolioHolding = async (
           average_cost: newAverageCost,
           updated_at: new Date().toISOString()
         })
-        .eq('id', existingHolding.id);
+        .eq('id', existingHolding.id)
+        .eq('user_id', user.id);
       
       if (updateError) {
         console.error('Error updating holding:', updateError);
@@ -209,6 +218,7 @@ export const updatePortfolioHolding = async (
       const { error: insertError } = await supabase
         .from('portfolio_holdings')
         .insert({ 
+          user_id: user.id,
           stock_id: stock.id, 
           quantity, 
           average_cost: price
@@ -224,6 +234,7 @@ export const updatePortfolioHolding = async (
     const { error: transactionError } = await supabase
       .from('transactions')
       .insert({
+        user_id: user.id,
         stock_id: stock.id,
         transaction_type: 'buy',
         price,

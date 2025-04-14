@@ -426,3 +426,46 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+// Add RLS policies for portfolio_holdings
+export const createPortfolioHoldingsPolicies = async (supabase: SupabaseClient) => {
+  // Enable RLS
+  await supabase.rpc('enable_rls', { table_name: 'portfolio_holdings' });
+
+  // Create policies
+  await supabase.rpc('create_policy', {
+    table_name: 'portfolio_holdings',
+    policy_name: 'Users can view their own holdings',
+    using: 'auth.uid() = user_id',
+    check: null,
+    with_check: null,
+    command: 'SELECT'
+  });
+
+  await supabase.rpc('create_policy', {
+    table_name: 'portfolio_holdings',
+    policy_name: 'Users can insert their own holdings',
+    using: null,
+    check: 'auth.uid() = user_id',
+    with_check: 'auth.uid() = user_id',
+    command: 'INSERT'
+  });
+
+  await supabase.rpc('create_policy', {
+    table_name: 'portfolio_holdings',
+    policy_name: 'Users can update their own holdings',
+    using: 'auth.uid() = user_id',
+    check: 'auth.uid() = user_id',
+    with_check: 'auth.uid() = user_id',
+    command: 'UPDATE'
+  });
+
+  await supabase.rpc('create_policy', {
+    table_name: 'portfolio_holdings',
+    policy_name: 'Users can delete their own holdings',
+    using: 'auth.uid() = user_id',
+    check: null,
+    with_check: null,
+    command: 'DELETE'
+  });
+};

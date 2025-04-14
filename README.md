@@ -1,73 +1,163 @@
-# Welcome to your Lovable project
+# Radiant Portfolio Pulse
 
-## Project info
+A modern stock portfolio management application built with React, Redux, and Supabase, featuring real-time stock data from Finnhub.
 
-**URL**: https://lovable.dev/projects/78ade262-a469-4f89-8c71-82a68373bbc1
+## Features
 
-## How can I edit this code?
+- Real-time stock data and portfolio tracking
+- Watchlist management with price alerts
+- Transaction history with filtering
+- Portfolio analytics and performance metrics
+- User settings and preferences
+- Responsive design with dark/light mode support
 
-There are several ways of editing your application.
+## Prerequisites
 
-**Use Lovable**
+- Node.js (v16 or higher)
+- npm or yarn
+- Supabase account
+- Finnhub API key
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/78ade262-a469-4f89-8c71-82a68373bbc1) and start prompting.
+## Setup
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/radiant-portfolio-pulse.git
+cd radiant-portfolio-pulse
 ```
 
-**Edit a file directly in GitHub**
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+3. Create a `.env` file in the root directory with the following variables:
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_FINNHUB_API_KEY=your_finnhub_api_key
+```
 
-**Use GitHub Codespaces**
+4. Set up the Supabase database tables:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Execute the following SQL in your Supabase SQL editor:
 
-## What technologies are used for this project?
+```sql
+-- Enable Row Level Security (RLS)
+alter table public.profiles enable row level security;
+alter table public.portfolio_holdings enable row level security;
+alter table public.stocks enable row level security;
+alter table public.transactions enable row level security;
+alter table public.watchlist_items enable row level security;
 
-This project is built with:
+-- Create RLS policies
+create policy "Users can view their own profile"
+  on public.profiles for select
+  using ( auth.uid() = id );
 
-- Vite
+create policy "Users can update their own profile"
+  on public.profiles for update
+  using ( auth.uid() = id );
+
+create policy "Users can view their own portfolio holdings"
+  on public.portfolio_holdings for select
+  using ( auth.uid() = user_id );
+
+create policy "Users can manage their own portfolio holdings"
+  on public.portfolio_holdings for all
+  using ( auth.uid() = user_id );
+
+create policy "Users can view stocks"
+  on public.stocks for select
+  to authenticated
+  using ( true );
+
+create policy "Users can view their own transactions"
+  on public.transactions for select
+  using ( auth.uid() = user_id );
+
+create policy "Users can manage their own transactions"
+  on public.transactions for all
+  using ( auth.uid() = user_id );
+
+create policy "Users can view their own watchlist items"
+  on public.watchlist_items for select
+  using ( auth.uid() = user_id );
+
+create policy "Users can manage their own watchlist items"
+  on public.watchlist_items for all
+  using ( auth.uid() = user_id );
+
+-- Create functions for Finnhub API integration
+create or replace function get_finnhub_api_key()
+returns text as $$
+begin
+  return current_setting('app.finnhub_api_key');
+end;
+$$ language plpgsql security definer;
+
+-- Set up database functions
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, created_at, updated_at)
+  values (new.id, now(), now());
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Set up trigger for new user profiles
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+```
+
+5. Start the development server:
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+The application will be available at `http://localhost:5173`.
+
+## Usage
+
+1. Sign up for an account or log in if you already have one.
+2. Add stocks to your portfolio using the "Add Stock" button.
+3. Set up watchlists and price alerts for stocks you're interested in.
+4. Track your portfolio performance and view analytics.
+5. Manage your settings and preferences.
+
+## Development
+
+- `npm run build` - Build the production version
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview the production build locally
+
+## Technologies Used
+
+- React 18
+- Redux Toolkit
 - TypeScript
-- React
-- shadcn-ui
+- Vite
 - Tailwind CSS
+- Supabase
+- Finnhub API
+- Chart.js
+- HeadlessUI
+- Hero Icons
 
-## How can I deploy this project?
+## Contributing
 
-Simply open [Lovable](https://lovable.dev/projects/78ade262-a469-4f89-8c71-82a68373bbc1) and click on Share -> Publish.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Can I connect a custom domain to my Lovable project?
+## License
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
