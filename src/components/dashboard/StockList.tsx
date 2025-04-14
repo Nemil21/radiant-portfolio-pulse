@@ -2,22 +2,36 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, ChevronUp, ChevronDown, Search } from "lucide-react";
-import { StockData } from '@/data/mockData';
+import { Button } from "@/components/ui/button";
+import { BarChart3, ChevronUp, ChevronDown, Search, TrendingUp, TrendingDown, Eye, EyeOff, MoreHorizontal } from "lucide-react";
 import { Input } from '@/components/ui/input';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { useFinance } from '@/context/FinanceContext';
+import AddStockDialog from '@/components/stocks/AddStockDialog';
+import StockActionDialog from '@/components/stocks/StockActionDialog';
+import { PortfolioHolding } from '@/services/portfolioService';
+import { WatchlistItem } from '@/services/watchlistService';
 
 interface StockListProps {
-  stocks: StockData[];
+  stocks: PortfolioHolding[] | WatchlistItem[];
   title?: string;
   icon?: React.ReactNode;
+  type?: 'portfolio' | 'watchlist';
 }
 
 const StockList: React.FC<StockListProps> = ({ 
   stocks, 
   title = "Your Portfolio",
   icon = <BarChart3 className="h-5 w-5 mr-2" />,
+  type = 'portfolio'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const { removeFromWatchlist, addToWatchlist } = useFinance();
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -43,24 +57,43 @@ const StockList: React.FC<StockListProps> = ({
     stock.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
+  const handleRemoveFromWatchlist = async (id: string) => {
+    await removeFromWatchlist(id);
+  };
+  
+  const handleAddToWatchlist = async (symbol: string) => {
+    await addToWatchlist(symbol);
+  };
+  
   return (
     <Card className="glass h-full animate-fade-in animate-delay-300">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-medium flex items-center">
           {icon}
           {title}
         </CardTitle>
-        <div className="relative mt-2">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search stocks..."
-            className="pl-8 bg-secondary/20 border-secondary/30"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        <AddStockDialog 
+          mode={type} 
+          trigger={
+            <Button size="sm" className="h-8 gap-1">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Add {type === 'portfolio' ? 'Stock' : 'to Watchlist'}
+            </Button>
+          }
+        />
       </CardHeader>
       <CardContent className="p-0">
+        <div className="px-4 pt-2 pb-3">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search stocks..."
+              className="pl-8 bg-secondary/20 border-secondary/30"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
         <div className="max-h-[400px] overflow-auto">
           <Table>
             <TableHeader className="bg-secondary/20 sticky top-0">
@@ -69,12 +102,13 @@ const StockList: React.FC<StockListProps> = ({
                 <TableHead>Name</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Change</TableHead>
-                {stocks[0]?.quantity > 0 && (
+                {type === 'portfolio' && (
                   <>
                     <TableHead className="text-right">Holdings</TableHead>
                     <TableHead className="text-right">Profit/Loss</TableHead>
                   </>
                 )}
+                <TableHead className="w-[100px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -95,7 +129,7 @@ const StockList: React.FC<StockListProps> = ({
                         {Math.abs(stock.changePercent).toFixed(2)}%
                       </div>
                     </TableCell>
-                    {stock.quantity > 0 && (
+                    {type === 'portfolio' && 'quantity' in stock && (
                       <>
                         <TableCell className="text-right">
                           <div className="flex flex-col">
@@ -111,11 +145,68 @@ const StockList: React.FC<StockListProps> = ({
                         </TableCell>
                       </>
                     )}
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        {type === 'portfolio' && 'quantity' in stock ? (
+                          <>
+                            <StockActionDialog
+                              holdingId={stock.id}
+                              stockSymbol={stock.symbol}
+                              stockName={stock.name}
+                              currentPrice={stock.price}
+                              action="buy"
+                              trigger={
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-finance-profit">
+                                  <TrendingUp className="h-4 w-4" />
+                                </Button>
+                              }
+                            />
+                            <StockActionDialog
+                              holdingId={stock.id}
+                              stockSymbol={stock.symbol}
+                              stockName={stock.name}
+                              currentPrice={stock.price}
+                              action="sell"
+                              trigger={
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-finance-loss">
+                                  <TrendingDown className="h-4 w-4" />
+                                </Button>
+                              }
+                            />
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleAddToWatchlist(stock.symbol)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Add to Watchlist
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        ) : (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => handleRemoveFromWatchlist(stock.id)}
+                          >
+                            <EyeOff className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={stocks[0]?.quantity > 0 ? 6 : 4} className="text-center text-muted-foreground py-6">
+                  <TableCell 
+                    colSpan={type === 'portfolio' ? 7 : 5} 
+                    className="text-center text-muted-foreground py-6"
+                  >
                     No stocks found
                   </TableCell>
                 </TableRow>

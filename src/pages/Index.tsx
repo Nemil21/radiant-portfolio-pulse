@@ -50,7 +50,11 @@ const Index = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <div className="lg:col-span-3">
-              <StockList stocks={stocks} />
+              <StockList 
+                stocks={stocks} 
+                title="Your Portfolio" 
+                type="portfolio"
+              />
             </div>
             <div className="flex flex-col gap-4">
               <TopPerformers stocks={stocks} />
@@ -58,6 +62,7 @@ const Index = () => {
                 stocks={watchlist} 
                 title="Watchlist" 
                 icon={<Eye className="h-5 w-5 mr-2" />} 
+                type="watchlist"
               />
             </div>
           </div>

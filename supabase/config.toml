@@ -1,1 +1,47 @@
+
 project_id = "xbrttrvqtojrznpioswt"
+
+[api]
+enabled = true
+# Listens on port 54321
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+# Port to use for the local database URL.
+port = 54322
+
+[studio]
+enabled = true
+# Studio listens on port 54323
+port = 54323
+
+# Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
+# are monitored, and you can view the emails that would have been sent from the web interface.
+[inbucket]
+enabled = true
+# The inbucket UI is served on :54324
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+
+[realtime]
+enabled = true
+
+[functions]
+enabled = true
+
+[functions.search-stocks]
+verify_jwt = true
+
+[functions.stock-quote]
+verify_jwt = true
+
+[vector]
+enabled = true

@@ -9,19 +9,309 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      portfolio_holdings: {
+        Row: {
+          average_cost: number
+          created_at: string
+          id: string
+          quantity: number
+          stock_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_cost: number
+          created_at?: string
+          id?: string
+          quantity: number
+          stock_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_cost?: number
+          created_at?: string
+          id?: string
+          quantity?: number
+          stock_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_holdings_stock_id_fkey"
+            columns: ["stock_id"]
+            isOneToOne: false
+            referencedRelation: "stocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          currency: string | null
+          display_preferences: Json | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          notification_preferences: Json | null
+          theme: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          currency?: string | null
+          display_preferences?: Json | null
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          notification_preferences?: Json | null
+          theme?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          currency?: string | null
+          display_preferences?: Json | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          notification_preferences?: Json | null
+          theme?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stocks: {
+        Row: {
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          sector: string | null
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          sector?: string | null
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          sector?: string | null
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          price: number
+          quantity: number
+          stock_id: string
+          transaction_date: string
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price: number
+          quantity: number
+          stock_id: string
+          transaction_date?: string
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price?: number
+          quantity?: number
+          stock_id?: string
+          transaction_date?: string
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_stock_id_fkey"
+            columns: ["stock_id"]
+            isOneToOne: false
+            referencedRelation: "stocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watchlist_items: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          price_alert_high: number | null
+          price_alert_low: number | null
+          stock_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          price_alert_high?: number | null
+          price_alert_low?: number | null
+          stock_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          price_alert_high?: number | null
+          price_alert_low?: number | null
+          stock_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_items_stock_id_fkey"
+            columns: ["stock_id"]
+            isOneToOne: false
+            referencedRelation: "stocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      bytea_to_text: {
+        Args: { data: string }
+        Returns: string
+      }
+      get_finnhub_api_key: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_historical_data: {
+        Args: {
+          stock_symbol: string
+          resolution: string
+          from_timestamp: number
+          to_timestamp: number
+        }
+        Returns: Json
+      }
+      get_stock_details: {
+        Args: { stock_symbol: string }
+        Returns: Json
+      }
+      get_stock_price: {
+        Args: { stock_symbol: string }
+        Returns: Json
+      }
+      http: {
+        Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_delete: {
+        Args:
+          | { uri: string }
+          | { uri: string; content: string; content_type: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_get: {
+        Args: { uri: string; data: Json } | { uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_head: {
+        Args: { uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_header: {
+        Args: { field: string; value: string }
+        Returns: Database["public"]["CompositeTypes"]["http_header"]
+      }
+      http_list_curlopt: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          curlopt: string
+          value: string
+        }[]
+      }
+      http_patch: {
+        Args: { uri: string; content: string; content_type: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_post: {
+        Args:
+          | { uri: string; data: Json }
+          | { uri: string; content: string; content_type: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_put: {
+        Args: { uri: string; content: string; content_type: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_reset_curlopt: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      http_set_curlopt: {
+        Args: { curlopt: string; value: string }
+        Returns: boolean
+      }
+      text_to_bytea: {
+        Args: { data: string }
+        Returns: string
+      }
+      urlencode: {
+        Args: { string: string } | { string: string } | { data: Json }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
     }
     CompositeTypes: {
-      [_ in never]: never
+      http_header: {
+        field: string | null
+        value: string | null
+      }
+      http_request: {
+        method: unknown | null
+        uri: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content_type: string | null
+        content: string | null
+      }
+      http_response: {
+        status: number | null
+        content_type: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content: string | null
+      }
     }
   }
 }

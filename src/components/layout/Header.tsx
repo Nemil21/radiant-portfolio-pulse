@@ -1,96 +1,165 @@
 
 import React from 'react';
-import { Bell, Search, Menu } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  LogOut,
+  Search,
+  Bell,
+  User,
+  Settings,
+  Menu,
+  X
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useToast } from '@/components/ui/use-toast';
+import { useMobile } from '@/hooks/use-mobile';
+import { useFinance } from '@/context/FinanceContext';
 
-interface HeaderProps {
-  onSidebarToggle?: () => void;
-}
+const Header = () => {
+  const isMobile = useMobile();
+  const [showMobileMenu, setShowMobileMenu] = React.useState(false);
+  const { user, profile, logout } = useFinance();
 
-const Header: React.FC<HeaderProps> = ({ onSidebarToggle }) => {
-  const { toast } = useToast();
-  
-  const handleNotification = () => {
-    toast({
-      title: "Notifications",
-      description: "You have no new notifications.",
-    });
+  const handleLogout = async () => {
+    await logout();
   };
-  
+
+  const userInitials = React.useMemo(() => {
+    if (profile?.firstName && profile?.lastName) {
+      return `${profile.firstName[0]}${profile.lastName[0]}`.toUpperCase();
+    }
+    return user?.email?.substring(0, 2).toUpperCase() || 'NA';
+  }, [profile, user]);
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 bg-background/95 px-4 sm:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-white/10">
-      <div className="flex items-center gap-2 lg:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="lg:hidden">
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Toggle Menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="glass-dark flex flex-col p-6">
-            <div className="text-xl font-bold flex items-center mb-6">
-              <div className="h-6 w-6 rounded-full bg-finance-teal mr-2 animate-pulse-slow"></div>
-              FinTrade
-            </div>
-            <nav className="flex flex-col gap-4">
-              <a href="#" className="flex items-center gap-2 text-lg hover:text-finance-teal transition-colors">
-                Dashboard
-              </a>
-              <a href="#" className="flex items-center gap-2 text-lg hover:text-finance-teal transition-colors">
-                Portfolio
-              </a>
-              <a href="#" className="flex items-center gap-2 text-lg hover:text-finance-teal transition-colors">
-                Transactions
-              </a>
-              <a href="#" className="flex items-center gap-2 text-lg hover:text-finance-teal transition-colors">
-                Watchlist
-              </a>
-              <a href="#" className="flex items-center gap-2 text-lg hover:text-finance-teal transition-colors">
-                Settings
-              </a>
-            </nav>
-          </SheetContent>
-        </Sheet>
-      </div>
-      
-      <div className="flex-1 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-white/10 backdrop-blur-md animate-fade-in">
+      <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center">
-          <h1 className="text-xl font-bold hidden lg:flex items-center">
-            <div className="h-6 w-6 rounded-full bg-finance-teal mr-2 animate-pulse-slow"></div>
-            FinTrade
-          </h1>
+          {isMobile && (
+            <Button
+              variant="ghost"
+              className="mr-2"
+              size="icon"
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+            >
+              {showMobileMenu ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </Button>
+          )}
+          <Link to="/" className="flex items-center">
+            <div className="h-8 w-8 rounded-full bg-finance-teal flex items-center justify-center mr-2">
+              <span className="text-black font-bold">F</span>
+            </div>
+            <span className="text-xl font-bold hidden sm:inline-block">FinTrade</span>
+          </Link>
         </div>
-        
-        <div className="hidden md:flex items-center w-full max-w-md mx-auto">
+
+        <div className="hidden md:flex flex-1 max-w-md mx-4">
           <div className="relative w-full">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search stocks, companies..."
-              className="pl-8 bg-secondary/20 border-secondary/30 w-full"
+              className="w-full bg-secondary/20 border-secondary/30 pl-10 pr-4 py-2 rounded-full"
+              placeholder="Search stocks..."
             />
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className="relative"
-            onClick={handleNotification}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative hidden sm:flex"
           >
             <Bell className="h-5 w-5" />
-            <span className="sr-only">Notifications</span>
-            <span className="absolute -top-1 -right-1 h-3 w-3 bg-finance-teal rounded-full" />
+            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-finance-teal"></span>
           </Button>
-          
-          <div className="h-8 w-8 rounded-full bg-secondary/80 flex items-center justify-center text-sm font-medium">
-            JS
-          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="relative h-9 w-9 rounded-full"
+              >
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={profile?.avatarUrl || ''} alt={user?.email || 'User'} />
+                  <AvatarFallback className="bg-finance-teal text-black font-medium">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
+
+      {/* Mobile Navigation Menu */}
+      {isMobile && showMobileMenu && (
+        <div className="fixed inset-0 top-16 z-40 bg-background/95 backdrop-blur-sm animate-in fade-in">
+          <nav className="flex flex-col h-full p-4 space-y-4">
+            <div className="relative w-full mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="w-full bg-secondary/20 border-secondary/30 pl-10 pr-4 py-2 rounded-full"
+                placeholder="Search stocks..."
+              />
+            </div>
+            
+            <div className="flex flex-col space-y-1">
+              <Button variant="ghost" className="justify-start" asChild>
+                <Link to="/">Dashboard</Link>
+              </Button>
+              <Button variant="ghost" className="justify-start">
+                Portfolio
+              </Button>
+              <Button variant="ghost" className="justify-start">
+                Watchlist
+              </Button>
+              <Button variant="ghost" className="justify-start">
+                Transactions
+              </Button>
+              <Button variant="ghost" className="justify-start">
+                Settings
+              </Button>
+            </div>
+            
+            <div className="mt-auto">
+              <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out
+              </Button>
+            </div>
+          </nav>
+        </div>
+      )}
     </header>
   );
 };

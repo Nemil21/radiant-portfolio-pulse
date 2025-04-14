@@ -6,7 +6,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FinanceProvider } from "./context/FinanceContext";
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import AuthGuard from "./components/auth/AuthGuard";
 
 const queryClient = new QueryClient();
 
@@ -18,8 +20,13 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/auth" element={<Auth />} />
+            
+            <Route element={<AuthGuard />}>
+              <Route path="/" element={<Index />} />
+              {/* Additional protected routes go here */}
+            </Route>
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
