@@ -1,7 +1,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const FINNHUB_API_KEY = 'cvudpv1r01qjg1396060cvudpv1r01qjg139606g';
+const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

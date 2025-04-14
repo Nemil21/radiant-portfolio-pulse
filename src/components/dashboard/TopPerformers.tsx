@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown } from 'lucide-react';
@@ -18,10 +17,10 @@ const TopPerformers: React.FC<TopPerformersProps> = ({ stocks }) => {
     }).format(value);
   };
   
-  // Get top 3 gainers and losers
+  // Get top 3 gainers and losers, ensuring no overlap
   const sortedByProfit = [...stocks].sort((a, b) => b.profitPercent - a.profitPercent);
-  const gainers = sortedByProfit.slice(0, 3);
-  const losers = sortedByProfit.slice(-3).reverse();
+  const gainers = sortedByProfit.filter(stock => stock.profitPercent > 0).slice(0, 3);
+  const losers = sortedByProfit.filter(stock => stock.profitPercent < 0).slice(-3).reverse();
   
   return (
     <Card className="glass h-full animate-fade-in animate-delay-400">
@@ -41,16 +40,26 @@ const TopPerformers: React.FC<TopPerformersProps> = ({ stocks }) => {
                   key={stock.id} 
                   className="flex items-center justify-between p-2 rounded-lg bg-finance-profit/10 border border-finance-profit/20 animate-slide-in"
                 >
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: stock.color }}></div>
-                    <span className="font-medium">{stock.symbol}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{stock.name}</span>
+                  <div className="flex flex-col">
+                    <div className="flex items-center">
+                      <div className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: stock.color }}></div>
+                      <span className="font-medium">{stock.symbol}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{stock.name}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {formatCurrency(stock.averageCost)} → {formatCurrency(stock.price)}
+                    </div>
                   </div>
                   <div className="text-finance-profit text-sm">
                     +{stock.profitPercent.toFixed(2)}%
                   </div>
                 </div>
               ))}
+              {gainers.length === 0 && (
+                <div className="text-sm text-muted-foreground text-center py-2">
+                  No gainers found
+                </div>
+              )}
             </div>
           </div>
           
@@ -65,16 +74,26 @@ const TopPerformers: React.FC<TopPerformersProps> = ({ stocks }) => {
                   key={stock.id} 
                   className="flex items-center justify-between p-2 rounded-lg bg-finance-loss/10 border border-finance-loss/20 animate-slide-in"
                 >
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: stock.color }}></div>
-                    <span className="font-medium">{stock.symbol}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{stock.name}</span>
+                  <div className="flex flex-col">
+                    <div className="flex items-center">
+                      <div className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: stock.color }}></div>
+                      <span className="font-medium">{stock.symbol}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{stock.name}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Cost: {formatCurrency(stock.averageCost)} → Current: {formatCurrency(stock.price)}
+                    </div>
                   </div>
                   <div className="text-finance-loss text-sm">
                     {stock.profitPercent.toFixed(2)}%
                   </div>
                 </div>
               ))}
+              {losers.length === 0 && (
+                <div className="text-sm text-muted-foreground text-center py-2">
+                  No losers found
+                </div>
+              )}
             </div>
           </div>
         </div>

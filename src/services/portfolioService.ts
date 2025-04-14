@@ -24,6 +24,8 @@ export interface PortfolioSummary {
   totalProfit: number;
   totalProfitPercent: number;
   stockCount: number;
+  dailyChange: number;
+  dailyChangePercent: number;
 }
 
 export interface Transaction {
@@ -41,6 +43,14 @@ export interface Transaction {
 // Get all stocks in a user's portfolio
 export const getPortfolioHoldings = async (): Promise<PortfolioHolding[]> => {
   try {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('Error getting authenticated user:', userError);
+      return [];
+    }
+
     const { data: holdings, error: holdingsError } = await supabase
       .from('portfolio_holdings')
       .select(`
@@ -54,7 +64,8 @@ export const getPortfolioHoldings = async (): Promise<PortfolioHolding[]> => {
           sector,
           logo_url
         )
-      `);
+      `)
+      .eq('user_id', user.id);
     
     if (holdingsError) {
       console.error('Error fetching portfolio holdings:', holdingsError);
@@ -64,40 +75,51 @@ export const getPortfolioHoldings = async (): Promise<PortfolioHolding[]> => {
     // Get current prices for all stocks in portfolio
     const enrichedHoldings = await Promise.all(
       holdings.map(async (holding) => {
-        const stockQuote = await getStockQuote(holding.stocks.symbol);
-        
-        // Generate a random color for the stock if not available
-        const color = generateStockColor(holding.stocks.symbol);
-        
-        const currentPrice = stockQuote?.c || 0;
-        const priceChange = stockQuote?.d || 0;
-        const priceChangePercent = stockQuote?.dp || 0;
-        
-        const value = currentPrice * holding.quantity;
-        const cost = holding.average_cost * holding.quantity;
-        const profit = value - cost;
-        const profitPercent = cost > 0 ? (profit / cost) * 100 : 0;
-        
-        return {
-          id: holding.id,
-          stockId: holding.stocks.id,
-          symbol: holding.stocks.symbol,
-          name: holding.stocks.name,
-          sector: holding.stocks.sector,
-          color,
-          quantity: holding.quantity,
-          price: currentPrice,
-          averageCost: holding.average_cost,
-          value,
-          change: priceChange,
-          changePercent: priceChangePercent,
-          profit,
-          profitPercent
-        };
+        try {
+          const stockQuote = await getStockQuote(holding.stocks.symbol);
+          
+          if (!stockQuote) {
+            console.error(`Failed to fetch quote for ${holding.stocks.symbol}`);
+            return null;
+          }
+          
+          // Generate a random color for the stock if not available
+          const color = generateStockColor(holding.stocks.symbol);
+          
+          const currentPrice = stockQuote.c;
+          const priceChange = stockQuote.d;
+          const priceChangePercent = stockQuote.dp;
+          
+          const value = currentPrice * holding.quantity;
+          const cost = holding.average_cost * holding.quantity;
+          const profit = value - cost;
+          const profitPercent = cost > 0 ? (profit / cost) * 100 : 0;
+          
+          return {
+            id: holding.id,
+            stockId: holding.stocks.id,
+            symbol: holding.stocks.symbol,
+            name: holding.stocks.name,
+            sector: holding.stocks.sector,
+            color,
+            quantity: holding.quantity,
+            price: currentPrice,
+            averageCost: holding.average_cost,
+            value,
+            change: priceChange,
+            changePercent: priceChangePercent,
+            profit,
+            profitPercent
+          };
+        } catch (error) {
+          console.error(`Error processing holding for ${holding.stocks.symbol}:`, error);
+          return null;
+        }
       })
     );
     
-    return enrichedHoldings;
+    // Filter out any null values and return the enriched holdings
+    return enrichedHoldings.filter((holding): holding is PortfolioHolding => holding !== null);
   } catch (error) {
     console.error('Error in getPortfolioHoldings:', error);
     return [];
@@ -114,12 +136,18 @@ export const getPortfolioSummary = async (): Promise<PortfolioSummary> => {
     const totalProfit = totalValue - totalCost;
     const totalProfitPercent = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
     
+    // Calculate daily change
+    const dailyChange = holdings.reduce((sum, holding) => sum + (holding.change * holding.quantity), 0);
+    const dailyChangePercent = totalValue > 0 ? (dailyChange / totalValue) * 100 : 0;
+    
     return {
       totalValue,
       totalCost,
       totalProfit,
       totalProfitPercent,
-      stockCount: holdings.length
+      stockCount: holdings.length,
+      dailyChange,
+      dailyChangePercent
     };
   } catch (error) {
     console.error('Error in getPortfolioSummary:', error);
@@ -128,7 +156,9 @@ export const getPortfolioSummary = async (): Promise<PortfolioSummary> => {
       totalCost: 0,
       totalProfit: 0,
       totalProfitPercent: 0,
-      stockCount: 0
+      stockCount: 0,
+      dailyChange: 0,
+      dailyChangePercent: 0
     };
   }
 };
@@ -255,7 +285,7 @@ export const updatePortfolioHolding = async (
 };
 
 // Remove stock from portfolio
-export const removePortfolioHolding = async (holdingId: string, sellPrice: number): Promise<boolean> => {
+export const removePortfolioHolding = async (holdingId: string, sellQuantity: number, sellPrice: number): Promise<boolean> => {
   try {
     // Get the holding details first
     const { data: holding, error: holdingError } = await supabase
@@ -276,9 +306,9 @@ export const removePortfolioHolding = async (holdingId: string, sellPrice: numbe
         stock_id: holding.stock_id,
         transaction_type: 'sell',
         price: sellPrice,
-        quantity: holding.quantity,
+        quantity: sellQuantity,
         transaction_date: new Date().toISOString(),
-        notes: 'Removed from portfolio'
+        notes: sellQuantity === holding.quantity ? 'Removed from portfolio' : 'Partial sell'
       });
     
     if (transactionError) {
@@ -286,15 +316,29 @@ export const removePortfolioHolding = async (holdingId: string, sellPrice: numbe
       // We'll still continue as the transaction record is not critical
     }
     
-    // Now delete the holding
-    const { error: deleteError } = await supabase
-      .from('portfolio_holdings')
-      .delete()
-      .eq('id', holdingId);
-    
-    if (deleteError) {
-      console.error('Error deleting holding:', deleteError);
-      return false;
+    if (sellQuantity === holding.quantity) {
+      // If selling all shares, delete the holding
+      const { error: deleteError } = await supabase
+        .from('portfolio_holdings')
+        .delete()
+        .eq('id', holdingId);
+      
+      if (deleteError) {
+        console.error('Error deleting holding:', deleteError);
+        return false;
+      }
+    } else {
+      // If selling partial shares, update the quantity
+      const newQuantity = holding.quantity - sellQuantity;
+      const { error: updateError } = await supabase
+        .from('portfolio_holdings')
+        .update({ quantity: newQuantity })
+        .eq('id', holdingId);
+      
+      if (updateError) {
+        console.error('Error updating holding quantity:', updateError);
+        return false;
+      }
     }
     
     return true;

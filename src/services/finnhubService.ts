@@ -1,5 +1,7 @@
+import axios from 'axios';
 
-import { supabase } from "@/integrations/supabase/client";
+const FINNHUB_API_URL = 'https://finnhub.io/api/v1';
+const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
 
 // Types for Finnhub API responses
 export interface StockQuote {
@@ -46,13 +48,23 @@ export interface HistoricalData {
   v: number[]; // Volumes
 }
 
+// Create axios instance with default config
+const finnhubClient = axios.create({
+  baseURL: FINNHUB_API_URL,
+  params: {
+    token: FINNHUB_API_KEY
+  }
+});
+
 // Get current price quote for a stock
 export const getStockQuote = async (symbol: string): Promise<StockQuote | null> => {
   try {
-    const { data, error } = await supabase.rpc('get_stock_price', { stock_symbol: symbol });
+    const { data } = await finnhubClient.get<StockQuote>('/quote', {
+      params: { symbol }
+    });
     
-    if (error) {
-      console.error('Error fetching stock quote:', error);
+    if (!data || typeof data.c !== 'number') {
+      console.error('Invalid quote data received:', data);
       return null;
     }
     
@@ -66,10 +78,12 @@ export const getStockQuote = async (symbol: string): Promise<StockQuote | null> 
 // Get company profile information
 export const getStockProfile = async (symbol: string): Promise<StockProfile | null> => {
   try {
-    const { data, error } = await supabase.rpc('get_stock_details', { stock_symbol: symbol });
+    const { data } = await finnhubClient.get<StockProfile>('/stock/profile2', {
+      params: { symbol }
+    });
     
-    if (error) {
-      console.error('Error fetching stock profile:', error);
+    if (!data || !data.name) {
+      console.error('Invalid profile data received:', data);
       return null;
     }
     
@@ -88,15 +102,17 @@ export const getHistoricalData = async (
   to: number = Math.floor(Date.now() / 1000)
 ): Promise<HistoricalData | null> => {
   try {
-    const { data, error } = await supabase.rpc('get_historical_data', { 
-      stock_symbol: symbol,
-      resolution,
-      from_timestamp: from,
-      to_timestamp: to
+    const { data } = await finnhubClient.get<HistoricalData>('/stock/candle', {
+      params: {
+        symbol,
+        resolution,
+        from,
+        to
+      }
     });
     
-    if (error) {
-      console.error('Error fetching historical data:', error);
+    if (!data || data.s !== 'ok') {
+      console.error('Invalid historical data received:', data);
       return null;
     }
     
@@ -110,24 +126,24 @@ export const getHistoricalData = async (
 // Search for stocks by query
 export const searchStocks = async (query: string): Promise<StockSearchResult[]> => {
   try {
-    // Since we're storing common stocks in our Supabase database, we'll search there first
-    const { data, error } = await supabase
-      .from('stocks')
-      .select('*')
-      .or(`symbol.ilike.%${query}%,name.ilike.%${query}%`)
-      .limit(10);
+    const { data } = await finnhubClient.get('/search', {
+      params: { q: query }
+    });
     
-    if (error) {
-      console.error('Error searching stocks:', error);
+    if (!data || !Array.isArray(data.result)) {
+      console.error('Invalid search results received:', data);
       return [];
     }
     
-    return data.map(stock => ({
-      symbol: stock.symbol,
-      displaySymbol: stock.symbol,
-      description: stock.name,
-      type: 'Common Stock'
-    }));
+    return data.result
+      .filter(item => item.type === 'Common Stock')
+      .map(item => ({
+        symbol: item.symbol,
+        displaySymbol: item.displaySymbol,
+        description: item.description,
+        type: item.type
+      }))
+      .slice(0, 10); // Limit to 10 results
   } catch (error) {
     console.error('Error in searchStocks:', error);
     return [];

@@ -13,6 +13,7 @@ import {
   Filler,
 } from 'chart.js';
 import type { RootState } from '../store';
+import { getSectorColor } from '@/data/mockData';
 
 ChartJS.register(
   CategoryScale,
@@ -72,14 +73,7 @@ export default function PortfolioAnalytics() {
     datasets: [
       {
         data: Object.values(metrics.sectorAllocation),
-        backgroundColor: [
-          'rgba(54, 162, 235, 0.8)',
-          'rgba(255, 99, 132, 0.8)',
-          'rgba(75, 192, 192, 0.8)',
-          'rgba(255, 206, 86, 0.8)',
-          'rgba(153, 102, 255, 0.8)',
-          'rgba(255, 159, 64, 0.8)',
-        ],
+        backgroundColor: Object.keys(metrics.sectorAllocation).map(sector => getSectorColor(sector)),
       },
     ],
   };

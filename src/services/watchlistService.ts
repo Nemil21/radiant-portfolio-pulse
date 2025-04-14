@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { getStockQuote } from "./finnhubService";
 import { StockData } from "@/data/mockData";
@@ -82,6 +81,14 @@ export const addToWatchlist = async (
   priceAlertLow?: number
 ): Promise<boolean> => {
   try {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('Error getting authenticated user:', userError);
+      return false;
+    }
+
     // First, check if the stock exists in our database
     let { data: stock, error: stockError } = await supabase
       .from('stocks')
@@ -125,6 +132,7 @@ export const addToWatchlist = async (
       .from('watchlist_items')
       .select('*')
       .eq('stock_id', stock.id)
+      .eq('user_id', user.id)
       .single();
     
     if (!itemError && existingItem) {
@@ -148,6 +156,7 @@ export const addToWatchlist = async (
       const { error: insertError } = await supabase
         .from('watchlist_items')
         .insert({ 
+          user_id: user.id,
           stock_id: stock.id, 
           category, 
           price_alert_high: priceAlertHigh,

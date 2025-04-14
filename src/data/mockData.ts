@@ -1,4 +1,3 @@
-
 import { faker } from '@faker-js/faker';
 
 // Types for our financial data
@@ -38,8 +37,8 @@ export interface SectorData {
   color: string;
 }
 
-// Generate consistent colors for different stocks and sectors
-const stockColors = [
+// Extended color palette for sectors
+const sectorColors = [
   '#2dd4bf', // teal
   '#a78bfa', // purple
   '#fbbf24', // amber
@@ -48,19 +47,36 @@ const stockColors = [
   '#34d399', // green
   '#fb923c', // orange
   '#818cf8', // indigo
+  '#f87171', // red
+  '#4ade80', // lime
+  '#e879f9', // fuchsia
+  '#38bdf8', // sky
+  '#facc15', // yellow
+  '#fb7185', // rose
+  '#a3e635', // lime
 ];
 
-// Sectors with assigned colors
-const sectors = [
-  { name: 'Technology', color: '#2dd4bf' },
-  { name: 'Financial', color: '#a78bfa' },
-  { name: 'Healthcare', color: '#fbbf24' },
-  { name: 'Consumer', color: '#60a5fa' },
-  { name: 'Energy', color: '#f472b6' },
-  { name: 'Industrial', color: '#34d399' },
-  { name: 'Materials', color: '#fb923c' },
-  { name: 'Real Estate', color: '#818cf8' },
-];
+// Map to store sector-color assignments
+let sectorColorMap = new Map<string, string>();
+
+// Function to get or assign a color for a sector
+export const getSectorColor = (sectorName: string): string => {
+  // If sector already has a color, return it
+  if (sectorColorMap.has(sectorName)) {
+    return sectorColorMap.get(sectorName)!;
+  }
+
+  // Find the first unused color
+  const usedColors = new Set(sectorColorMap.values());
+  const availableColor = sectorColors.find(color => !usedColors.has(color));
+
+  // If all colors are used, start reusing from the beginning
+  const color = availableColor || sectorColors[Math.floor(Math.random() * sectorColors.length)];
+  
+  // Assign the color to the sector
+  sectorColorMap.set(sectorName, color);
+  return color;
+};
 
 // Generate portfolio stocks
 export const generateStocks = (count: number = 8): StockData[] => {
@@ -140,15 +156,12 @@ export const generateSectorData = (stocks: StockData[]): SectorData[] => {
     sectorMap.set(stock.sector, currentValue + stock.value);
   });
   
-  // Convert to array and add colors
-  return Array.from(sectorMap.entries()).map(([name, value]) => {
-    const sectorInfo = sectors.find(s => s.name === name) || sectors[0];
-    return {
-      name,
-      value,
-      color: sectorInfo.color,
-    };
-  });
+  // Convert to array and assign colors
+  return Array.from(sectorMap.entries()).map(([name, value]) => ({
+    name,
+    value,
+    color: getSectorColor(name),
+  }));
 };
 
 // Portfolio summary data

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,7 +77,7 @@ interface FinanceContextType {
   logout: () => Promise<boolean>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<boolean>;
   addStock: (symbol: string, quantity: number, price: number) => Promise<boolean>;
-  removeStock: (holdingId: string, sellPrice: number) => Promise<boolean>;
+  removeStock: (holdingId: string, quantity: number, sellPrice: number) => Promise<boolean>;
   addToWatchlist: (symbol: string, category?: string) => Promise<boolean>;
   removeFromWatchlist: (watchlistItemId: string) => Promise<boolean>;
   searchStocks: (query: string) => Promise<StockSearchResult[]>;
@@ -258,12 +257,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return success;
   };
 
-  const removeStock = async (holdingId: string, sellPrice: number) => {
-    const success = await removePortfolioHolding(holdingId, sellPrice);
+  const removeStock = async (holdingId: string, quantity: number, sellPrice: number) => {
+    const success = await removePortfolioHolding(holdingId, quantity, sellPrice);
     if (success) {
       toast({
-        title: "Stock removed",
-        description: "The stock has been removed from your portfolio",
+        title: "Stock sold",
+        description: "The stock has been sold from your portfolio",
       });
       
       // Refresh data to get updated stocks
@@ -271,7 +270,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     } else {
       toast({
         title: "Error",
-        description: "Failed to remove stock from portfolio",
+        description: "Failed to sell stock from portfolio",
         variant: "destructive"
       });
     }

@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { PieChartIcon } from 'lucide-react';
 import { SectorData } from '@/data/mockData';
+import { getSectorColor } from '@/data/mockData';
 
 interface SectorBreakdownProps {
   sectorData: SectorData[];
@@ -80,7 +80,7 @@ const SectorBreakdown: React.FC<SectorBreakdownProps> = ({ sectorData }) => {
                 dataKey="value"
               >
                 {sectorData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+                  <Cell key={`cell-${index}`} fill={getSectorColor(entry.name)} />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />

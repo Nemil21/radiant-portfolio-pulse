@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -154,6 +153,7 @@ const StockList: React.FC<StockListProps> = ({
                               stockSymbol={stock.symbol}
                               stockName={stock.name}
                               currentPrice={stock.price}
+                              currentQuantity={stock.quantity}
                               action="buy"
                               trigger={
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-finance-profit">
@@ -166,6 +166,7 @@ const StockList: React.FC<StockListProps> = ({
                               stockSymbol={stock.symbol}
                               stockName={stock.name}
                               currentPrice={stock.price}
+                              currentQuantity={stock.quantity}
                               action="sell"
                               trigger={
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-finance-loss">

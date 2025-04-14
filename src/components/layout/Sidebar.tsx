@@ -1,12 +1,23 @@
-
 import React from 'react';
 import { LayoutDashboard, Briefcase, LineChart, BarChart, List, Settings } from 'lucide-react';
+import { useFinance } from '@/context/FinanceContext';
 
 interface SidebarProps {
   isOpen?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
+  const { portfolioSummary } = useFinance();
+  
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
   const sidebarItems = [
     { icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard', active: true },
     { icon: <Briefcase className="h-5 w-5" />, label: 'Portfolio', active: false },
@@ -19,12 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
   return (
     <aside className="hidden lg:flex flex-col w-60 border-r border-white/10 animate-fade-in">
       <div className="flex-1 py-6">
-        <div className="px-3 mb-6">
-          <h2 className="text-lg font-bold flex items-center px-3">
-            <div className="h-5 w-5 rounded-full bg-finance-teal mr-2 animate-pulse-slow"></div>
-            FinTrade
-          </h2>
-        </div>
+        
         <nav className="space-y-1 px-3">
           {sidebarItems.map((item, i) => (
             <a
@@ -49,10 +55,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
             <p className="text-sm font-medium text-white">Portfolio Balance</p>
             <LineChart className="h-4 w-4 text-finance-teal" />
           </div>
-          <p className="text-2xl font-bold">$248,890.24</p>
-          <p className="text-xs text-finance-profit flex items-center mt-1">
-            <span className="h-2 w-2 rounded-full bg-finance-profit mr-1"></span>
-            +2.5% today
+          <p className="text-2xl font-bold">
+            {portfolioSummary ? formatCurrency(portfolioSummary.totalValue) : formatCurrency(0)}
+          </p>
+          <p className={`text-xs flex items-center mt-1 ${
+            (portfolioSummary?.dailyChange ?? 0) >= 0 ? 'text-finance-profit' : 'text-finance-loss'
+          }`}>
+            <span className={`h-2 w-2 rounded-full mr-1 ${
+              (portfolioSummary?.dailyChange ?? 0) >= 0 ? 'bg-finance-profit' : 'bg-finance-loss'
+            }`}></span>
+            {(portfolioSummary?.dailyChange ?? 0) >= 0 ? '+' : ''}
+            {(portfolioSummary?.dailyChangePercent ?? 0).toFixed(2)}% today
           </p>
         </div>
       </div>
