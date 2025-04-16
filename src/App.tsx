@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,7 @@ import { FinanceProvider } from "./context/FinanceContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Transactions from "./pages/Transactions";
 import AuthGuard from "./components/auth/AuthGuard";
 
 const queryClient = new QueryClient();
@@ -24,6 +24,7 @@ const App = () => (
             
             <Route element={<AuthGuard />}>
               <Route path="/" element={<Index />} />
+              <Route path="/transactions" element={<Transactions />} />
               {/* Additional protected routes go here */}
             </Route>
             

@@ -11,6 +11,9 @@ export default {
   ],
   prefix: "",
   theme: {
+    fontFamily: {
+      sans: ['Poppins', 'sans-serif'],
+    },
     container: {
       center: true,
       padding: "2rem",
@@ -70,28 +73,28 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: 0 },
+          from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
           from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: 0 },
+          to: { height: "0" },
         },
         "pulse-slow": {
-          '0%, 100%': { opacity: 1 },
-          '50%': { opacity: 0.8 },
+          '0%, 100%': { opacity: "1" },
+          '50%': { opacity: "0.8" },
         },
         "fade-in": {
-          '0%': { opacity: 0, transform: 'translateY(10px)' },
-          '100%': { opacity: 1, transform: 'translateY(0)' },
+          '0%': { opacity: "0", transform: 'translateY(10px)' },
+          '100%': { opacity: "1", transform: 'translateY(0)' },
         },
         "slide-in": {
-          '0%': { transform: 'translateX(-20px)', opacity: 0 },
-          '100%': { transform: 'translateX(0)', opacity: 1 },
+          '0%': { transform: 'translateX(-20px)', opacity: "0" },
+          '100%': { transform: 'translateX(0)', opacity: "1" },
         },
         "scale-in": {
-          '0%': { transform: 'scale(0.95)', opacity: 0 },
-          '100%': { transform: 'scale(1)', opacity: 1 },
+          '0%': { transform: 'scale(0.95)', opacity: "0" },
+          '100%': { transform: 'scale(1)', opacity: "1" },
         },
       },
       animation: {

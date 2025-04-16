@@ -1,4 +1,5 @@
 import React from 'react';
+import { useFinance } from '@/context/FinanceContext';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import PortfolioValue from '@/components/dashboard/PortfolioValue';
@@ -7,7 +8,6 @@ import SectorBreakdown from '@/components/dashboard/SectorBreakdown';
 import StockList from '@/components/dashboard/StockList';
 import TopPerformers from '@/components/dashboard/TopPerformers';
 import { Eye } from 'lucide-react';
-import { useFinance } from '@/context/FinanceContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const Index = () => {

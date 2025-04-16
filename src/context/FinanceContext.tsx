@@ -10,6 +10,9 @@ import {
   updatePortfolioHolding, 
   removePortfolioHolding,
   getTransactions,
+  getUserTransactions,
+  getTransactionStats,
+  calculateProfitLoss as getProfitLossData, // Rename the imported function
   PortfolioHolding,
   PortfolioSummary,
   Transaction
@@ -60,6 +63,7 @@ interface FinanceContextType {
   loadingStocks: boolean;
   loadingWatchlist: boolean;
   loadingSummary: boolean;
+  loadingTransactions: boolean;
   
   // Portfolio data
   stocks: PortfolioHolding[];
@@ -76,9 +80,43 @@ interface FinanceContextType {
   
   // Transactions
   transactions: Transaction[];
+  transactionStats: {
+    totalBuys: number;
+    totalSells: number;
+    totalBuyAmount: number;
+    totalSellAmount: number;
+    buyPercentage: number;
+    sellPercentage: number;
+    monthlySummary: Array<{
+      month: string;
+      buyAmount: number;
+      sellAmount: number;
+      transactionCount: number;
+    }>;
+  };
+  
+  // Profit/Loss data
+  profitLossData: {
+    totalProfit: number;
+    totalLoss: number;
+    netProfitLoss: number;
+    profitLossPercentage: number;
+    sectorProfitLoss: Array<{
+      sector: string;
+      profit: number;
+      loss: number;
+      netProfitLoss: number;
+      profitLossPercentage: number;
+      transactionCount: number;
+    }>;
+  };
+  
+  // Timestamps
+  lastUpdated: Date;
   
   // Actions
   refreshData: () => Promise<void>;
+  refreshTransactions: () => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean, error?: string }>;
   register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ success: boolean, error?: string }>;
   logout: () => Promise<boolean>;
@@ -91,7 +129,59 @@ interface FinanceContextType {
   getHistoricalData: (symbol: string, resolution?: string, from?: number, to?: number) => Promise<HistoricalData | null>;
 }
 
-const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
+const FinanceContext = createContext<FinanceContextType>({
+  user: null,
+  profile: null,
+  isAuthenticated: false,
+  loading: false,
+  loadingStocks: false,
+  loadingWatchlist: false,
+  loadingSummary: false,
+  loadingTransactions: false,
+  stocks: [],
+  portfolioSummary: {
+    totalValue: 0,
+    totalCost: 0,
+    totalProfit: 0,
+    totalProfitPercent: 0,
+    stockCount: 0,
+    dailyChange: 0,
+    dailyChangePercent: 0
+  },
+  watchlist: [],
+  performanceData: generatePerformanceData(),
+  sectorData: [],
+  transactions: [],
+  transactionStats: {
+    totalBuys: 0,
+    totalSells: 0,
+    totalBuyAmount: 0,
+    totalSellAmount: 0,
+    buyPercentage: 0,
+    sellPercentage: 0,
+    monthlySummary: []
+  },
+  profitLossData: {
+    totalProfit: 0,
+    totalLoss: 0,
+    netProfitLoss: 0,
+    profitLossPercentage: 0,
+    sectorProfitLoss: []
+  },
+  lastUpdated: new Date(),
+  refreshData: async () => {},
+  refreshTransactions: async () => {},
+  login: async () => ({ success: false }),
+  register: async () => ({ success: false }),
+  logout: async () => false,
+  updateProfile: async () => false,
+  addStock: async () => false,
+  removeStock: async () => false,
+  addToWatchlist: async () => false,
+  removeFromWatchlist: async () => false,
+  searchStocks: async () => [],
+  getHistoricalData: async () => null
+});
 
 const CACHE_DURATION = 10 * 1000;
 
@@ -105,6 +195,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [loadingStocks, setLoadingStocks] = useState<boolean>(false);
   const [loadingWatchlist, setLoadingWatchlist] = useState<boolean>(false);
   const [loadingSummary, setLoadingSummary] = useState<boolean>(false);
+  const [loadingTransactions, setLoadingTransactions] = useState<boolean>(false);
   
   const [stocks, setStocks] = useState<PortfolioHolding[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -112,6 +203,22 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [sectorData, setSectorData] = useState<SectorData[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionStats, setTransactionStats] = useState({
+    totalBuys: 0,
+    totalSells: 0,
+    totalBuyAmount: 0,
+    totalSellAmount: 0,
+    buyPercentage: 0,
+    sellPercentage: 0,
+    monthlySummary: []
+  });
+  const [profitLossData, setProfitLossData] = useState({
+    totalProfit: 0,
+    totalLoss: 0,
+    netProfitLoss: 0,
+    profitLossPercentage: 0,
+    sectorProfitLoss: []
+  });
 
   // Listen for auth changes
   useEffect(() => {
@@ -257,9 +364,63 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       })
       .subscribe();
 
+    // Transactions subscription
+    const transactionsSubscription = supabase
+      .channel('transactions-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'transactions',
+        filter: `user_id=eq.${user.id}`
+      }, async (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const { data: transaction } = await supabase
+            .from('transactions')
+            .select(`
+              *,
+              stocks (
+                id,
+                symbol,
+                name,
+                sector,
+                logo_url
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single();
+
+          if (transaction) {
+            // Transform the database response to match the Transaction interface
+            const transformedTransaction: Transaction = {
+              id: transaction.id,
+              stockId: transaction.stock_id,
+              stockSymbol: transaction.stocks.symbol,
+              stockName: transaction.stocks.name,
+              transactionType: transaction.transaction_type as 'buy' | 'sell',
+              price: transaction.price,
+              quantity: transaction.quantity,
+              transactionDate: transaction.transaction_date,
+              notes: transaction.notes
+            };
+            
+            setTransactions(prev => {
+              const index = prev.findIndex(t => t.id === transformedTransaction.id);
+              if (index === -1) return [...prev, transformedTransaction];
+              const newTransactions = [...prev];
+              newTransactions[index] = transformedTransaction;
+              return newTransactions;
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
     return () => {
       portfolioSubscription.unsubscribe();
       watchlistSubscription.unsubscribe();
+      transactionsSubscription.unsubscribe();
     };
   }, [user]);
 
@@ -330,6 +491,19 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       const sectorsData = generateSectorData(adaptHoldingsToStockData(holdingsData));
       setSectorData(sectorsData);
       
+      // Fetch transaction data
+      setLoadingTransactions(true);
+      const transactionsData = await getUserTransactions();
+      setTransactions(transactionsData);
+      
+      const stats = await getTransactionStats();
+      setTransactionStats(stats);
+      setLoadingTransactions(false);
+      
+      // Calculate profit/loss data
+      const profitLossData = await calculateProfitLoss();
+      setProfitLossData(profitLossData);
+      
       setLastUpdated(now);
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -342,6 +516,28 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setLoading(false);
     }
   }, [lastUpdated]);
+
+  const refreshTransactions = useCallback(async () => {
+    try {
+      setLoadingTransactions(true);
+      
+      // Get transactions
+      const transactions = await getUserTransactions();
+      setTransactions(transactions);
+      
+      // Calculate transaction stats
+      const stats = await getTransactionStats();
+      setTransactionStats(stats);
+      
+      // Update profit/loss data
+      const profitLossData = await calculateProfitLoss();
+      setProfitLossData(profitLossData);
+    } catch (error) {
+      console.error('Error refreshing transactions:', error);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  }, []);
 
   const login = async (email: string, password: string) => {
     const result = await signIn(email, password);
@@ -455,10 +651,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         totalValue: holdingsData.reduce((sum, holding) => sum + holding.value, 0),
         totalCost: holdingsData.reduce((sum, holding) => sum + (holding.averageCost * holding.quantity), 0),
         totalProfit: holdingsData.reduce((sum, holding) => sum + holding.profit, 0),
-        totalProfitPercent: holdingsData.length > 0 ? holdingsData.reduce((sum, holding) => sum + holding.profitPercent, 0) / holdingsData.length : 0,
+        totalProfitPercent: holdingsData.reduce((sum, holding) => sum + holding.profitPercent, 0) / holdingsData.length,
         stockCount: holdingsData.length,
         dailyChange: holdingsData.reduce((sum, holding) => sum + (holding.change * holding.quantity), 0),
-        dailyChangePercent: holdingsData.length > 0 ? holdingsData.reduce((sum, holding) => sum + holding.changePercent, 0) / holdingsData.length : 0
+        dailyChangePercent: holdingsData.reduce((sum, holding) => sum + holding.changePercent, 0) / holdingsData.length
       };
       setPortfolioSummary(summaryData);
       
@@ -562,6 +758,24 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }));
   };
 
+  // Calculate profit/loss data
+  const calculateProfitLoss = async () => {
+    try {
+      // Use the implementation from portfolioService
+      const profitLossData = await getProfitLossData();
+      return profitLossData;
+    } catch (error) {
+      console.error('Error calculating profit/loss data:', error);
+      return {
+        totalProfit: 0,
+        totalLoss: 0,
+        netProfitLoss: 0,
+        profitLossPercentage: 0,
+        sectorProfitLoss: []
+      };
+    }
+  };
+
   // Set default values for context
   const defaultPortfolioSummary: PortfolioSummary = {
     totalValue: 0,
@@ -582,13 +796,18 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       loadingStocks,
       loadingWatchlist,
       loadingSummary,
+      loadingTransactions,
       stocks,
       portfolioSummary: portfolioSummary || defaultPortfolioSummary,
       watchlist,
       performanceData: performanceData || generatePerformanceData(),
       sectorData,
       transactions,
+      transactionStats,
+      profitLossData,
+      lastUpdated,
       refreshData,
+      refreshTransactions,
       login,
       register,
       logout,

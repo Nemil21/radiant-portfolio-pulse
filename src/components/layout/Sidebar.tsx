@@ -1,6 +1,7 @@
 import React from 'react';
 import { LayoutDashboard, Briefcase, LineChart, BarChart, List, Settings } from 'lucide-react';
 import { useFinance } from '@/context/FinanceContext';
+import { Link, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -8,6 +9,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
   const { portfolioSummary } = useFinance();
+  const location = useLocation();
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -19,12 +21,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
   };
 
   const sidebarItems = [
-    { icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard', active: true },
-    { icon: <Briefcase className="h-5 w-5" />, label: 'Portfolio', active: false },
-    { icon: <LineChart className="h-5 w-5" />, label: 'Transactions', active: false },
-    { icon: <BarChart className="h-5 w-5" />, label: 'Analytics', active: false },
-    { icon: <List className="h-5 w-5" />, label: 'Watchlist', active: false },
-    { icon: <Settings className="h-5 w-5" />, label: 'Settings', active: false },
+    { icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard', path: '/', active: location.pathname === '/' },
+    { icon: <Briefcase className="h-5 w-5" />, label: 'Portfolio', path: '/portfolio', active: location.pathname === '/portfolio' },
+    { icon: <LineChart className="h-5 w-5" />, label: 'Transactions', path: '/transactions', active: location.pathname === '/transactions' },
+    { icon: <BarChart className="h-5 w-5" />, label: 'Analytics', path: '/analytics', active: location.pathname === '/analytics' },
+    { icon: <List className="h-5 w-5" />, label: 'Watchlist', path: '/watchlist', active: location.pathname === '/watchlist' },
+    { icon: <Settings className="h-5 w-5" />, label: 'Settings', path: '/settings', active: location.pathname === '/settings' },
   ];
   
   return (
@@ -33,9 +35,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
         
         <nav className="space-y-1 px-3">
           {sidebarItems.map((item, i) => (
-            <a
+            <Link
               key={i}
-              href="#"
+              to={item.path}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                 item.active 
                   ? 'bg-white/10 text-white font-medium' 
@@ -45,7 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
             >
               {item.icon}
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
       </div>
