@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
@@ -9,10 +8,14 @@ import StockList from '@/components/dashboard/StockList';
 import TopPerformers from '@/components/dashboard/TopPerformers';
 import { Eye } from 'lucide-react';
 import { useFinance } from '@/context/FinanceContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Index = () => {
   const { 
     loading, 
+    loadingStocks,
+    loadingWatchlist,
+    loadingSummary,
     stocks, 
     watchlist, 
     performanceData, 
@@ -20,6 +23,7 @@ const Index = () => {
     portfolioSummary 
   } = useFinance();
 
+  // Only show full-screen loading on initial load
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -38,14 +42,31 @@ const Index = () => {
         <Sidebar />
         <main className="flex-1 overflow-auto p-4 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <PortfolioValue 
-              totalValue={portfolioSummary.totalValue}
-              totalProfit={portfolioSummary.totalProfit}
-              totalProfitPercent={portfolioSummary.totalProfitPercent}
-              historicalData={performanceData.monthly}
-            />
-            <PerformanceMetrics performanceData={performanceData} />
-            <SectorBreakdown sectorData={sectorData} />
+            {loadingSummary ? (
+              <Skeleton className="h-[300px] w-full rounded-lg" />
+            ) : (
+              <PortfolioValue 
+                totalValue={portfolioSummary.totalValue}
+                totalProfit={portfolioSummary.totalProfit}
+                totalProfitPercent={portfolioSummary.totalProfitPercent}
+                historicalData={performanceData.monthly}
+              />
+            )}
+            
+            {loadingSummary ? (
+              <Skeleton className="h-[300px] w-full rounded-lg" />
+            ) : (
+              <PerformanceMetrics performanceData={performanceData} />
+            )}
+            
+            {loadingSummary ? (
+              <Skeleton className="h-[300px] w-full rounded-lg" />
+            ) : (
+              <SectorBreakdown 
+                sectorData={sectorData}
+                loading={loadingSummary}
+              />
+            )}
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -54,15 +75,17 @@ const Index = () => {
                 stocks={stocks} 
                 title="Your Portfolio" 
                 type="portfolio"
+                loading={loadingStocks}
               />
             </div>
             <div className="flex flex-col gap-4">
-              <TopPerformers stocks={stocks} />
+              <TopPerformers stocks={stocks} loading={loadingStocks} />
               <StockList 
                 stocks={watchlist} 
                 title="Watchlist" 
                 icon={<Eye className="h-5 w-5 mr-2" />} 
                 type="watchlist"
+                loading={loadingWatchlist}
               />
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getStockQuote } from "./finnhubService";
+import { getStockQuote, getBatchQuotes } from "./finnhubService";
 
 export interface PortfolioHolding {
   id: string;
@@ -43,7 +43,6 @@ export interface Transaction {
 // Get all stocks in a user's portfolio
 export const getPortfolioHoldings = async (): Promise<PortfolioHolding[]> => {
   try {
-    // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user) {
@@ -51,6 +50,7 @@ export const getPortfolioHoldings = async (): Promise<PortfolioHolding[]> => {
       return [];
     }
 
+    // Fetch only necessary fields
     const { data: holdings, error: holdingsError } = await supabase
       .from('portfolio_holdings')
       .select(`
@@ -72,65 +72,72 @@ export const getPortfolioHoldings = async (): Promise<PortfolioHolding[]> => {
       return [];
     }
 
-    // Get current prices for all stocks in portfolio
-    const enrichedHoldings = await Promise.all(
-      holdings.map(async (holding) => {
-        try {
-          const stockQuote = await getStockQuote(holding.stocks.symbol);
-          
-          if (!stockQuote) {
-            console.error(`Failed to fetch quote for ${holding.stocks.symbol}`);
-            return null;
-          }
-          
-          // Generate a random color for the stock if not available
-          const color = generateStockColor(holding.stocks.symbol);
-          
-          const currentPrice = stockQuote.c;
-          const priceChange = stockQuote.d;
-          const priceChangePercent = stockQuote.dp;
-          
-          const value = currentPrice * holding.quantity;
-          const cost = holding.average_cost * holding.quantity;
-          const profit = value - cost;
-          const profitPercent = cost > 0 ? (profit / cost) * 100 : 0;
-          
-          return {
-            id: holding.id,
-            stockId: holding.stocks.id,
-            symbol: holding.stocks.symbol,
-            name: holding.stocks.name,
-            sector: holding.stocks.sector,
-            color,
-            quantity: holding.quantity,
-            price: currentPrice,
-            averageCost: holding.average_cost,
-            value,
-            change: priceChange,
-            changePercent: priceChangePercent,
-            profit,
-            profitPercent
-          };
-        } catch (error) {
-          console.error(`Error processing holding for ${holding.stocks.symbol}:`, error);
-          return null;
-        }
-      })
-    );
+    // Batch fetch quotes for all stocks
+    const symbols = holdings.map(h => h.stocks.symbol);
+    const quotes = await getBatchQuotes(symbols);
     
-    // Filter out any null values and return the enriched holdings
-    return enrichedHoldings.filter((holding): holding is PortfolioHolding => holding !== null);
+    // Process holdings with batch quotes
+    const enrichedHoldings = holdings.map(holding => {
+      const quote = quotes[holding.stocks.symbol];
+      if (!quote) {
+        console.error(`Failed to fetch quote for ${holding.stocks.symbol}`);
+        // Return a holding with default values instead of null
+        return {
+          id: holding.id,
+          stockId: holding.stocks.id,
+          symbol: holding.stocks.symbol,
+          name: holding.stocks.name,
+          sector: holding.stocks.sector || 'Unknown',
+          color: generateStockColor(holding.stocks.symbol),
+          quantity: holding.quantity,
+          price: 0, // Default price
+          averageCost: holding.average_cost,
+          value: 0,
+          change: 0,
+          changePercent: 0,
+          profit: 0,
+          profitPercent: 0,
+        };
+      }
+      
+      const color = generateStockColor(holding.stocks.symbol);
+      const currentPrice = quote.c;
+      const priceChange = quote.d;
+      const priceChangePercent = quote.dp;
+      
+      const value = currentPrice * holding.quantity;
+      const cost = holding.average_cost * holding.quantity;
+      const profit = value - cost;
+      const profitPercent = cost > 0 ? (profit / cost) * 100 : 0;
+      
+      return {
+        id: holding.id,
+        stockId: holding.stocks.id,
+        symbol: holding.stocks.symbol,
+        name: holding.stocks.name,
+        sector: holding.stocks.sector,
+        color,
+        quantity: holding.quantity,
+        price: currentPrice,
+        averageCost: holding.average_cost,
+        value,
+        change: priceChange,
+        changePercent: priceChangePercent,
+        profit,
+        profitPercent
+      };
+    });
+    
+    return enrichedHoldings;
   } catch (error) {
     console.error('Error in getPortfolioHoldings:', error);
     return [];
   }
 };
 
-// Get portfolio summary
-export const getPortfolioSummary = async (): Promise<PortfolioSummary> => {
+// Get portfolio summary - now calculated from holdings data
+export const getPortfolioSummary = async (holdings: PortfolioHolding[]): Promise<PortfolioSummary> => {
   try {
-    const holdings = await getPortfolioHoldings();
-    
     const totalValue = holdings.reduce((sum, holding) => sum + holding.value, 0);
     const totalCost = holdings.reduce((sum, holding) => sum + (holding.averageCost * holding.quantity), 0);
     const totalProfit = totalValue - totalCost;
