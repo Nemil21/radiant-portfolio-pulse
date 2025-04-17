@@ -3,6 +3,76 @@ import axios from 'axios';
 const FINNHUB_API_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
 
+// Cache and rate limiting configuration
+const CACHE_DURATION = 60 * 1000; // 1 minute cache
+const REQUEST_INTERVAL = 500; // 500ms between requests (max 120 requests per minute)
+const BATCH_SIZE = 3; // Process 3 symbols at a time
+
+// Cache for API responses
+interface CacheItem<T> {
+  data: T;
+  timestamp: number;
+}
+
+const cache: {
+  quotes: Record<string, CacheItem<StockQuote>>;
+  profiles: Record<string, CacheItem<StockProfile>>;
+  historical: Record<string, CacheItem<HistoricalData>>;
+  search: Record<string, CacheItem<StockSearchResult[]>>;
+} = {
+  quotes: {},
+  profiles: {},
+  historical: {},
+  search: {}
+};
+
+// Queue for API requests
+let requestQueue: (() => Promise<void>)[] = [];
+let isProcessingQueue = false;
+
+// Process the request queue with rate limiting
+const processQueue = async () => {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+  
+  isProcessingQueue = true;
+  
+  while (requestQueue.length > 0) {
+    const request = requestQueue.shift();
+    if (request) {
+      await request();
+      // Wait between requests to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, REQUEST_INTERVAL));
+    }
+  }
+  
+  isProcessingQueue = false;
+};
+
+// Add a request to the queue
+const enqueueRequest = <T>(request: () => Promise<T>): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    requestQueue.push(async () => {
+      try {
+        const result = await request();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    
+    // Start processing the queue if it's not already being processed
+    if (!isProcessingQueue) {
+      processQueue();
+    }
+  });
+};
+
+// Check if cached data is still valid
+const isCacheValid = <T>(cacheItem?: CacheItem<T>): boolean => {
+  if (!cacheItem) return false;
+  return Date.now() - cacheItem.timestamp < CACHE_DURATION;
+};
+
 // Types for Finnhub API responses
 export interface StockQuote {
   c: number;  // Current price
@@ -75,31 +145,71 @@ const finnhubClient = axios.create({
   params: {
     token: FINNHUB_API_KEY
   },
-  timeout: 5000 // 5 second timeout
+  timeout: 10000 // 10 second timeout
 });
 
 // Get current price quote for a stock
 export const getStockQuote = async (symbol: string): Promise<StockQuote | null> => {
   try {
+    // Check cache first
+    const cachedQuote = cache.quotes[symbol];
+    if (isCacheValid(cachedQuote)) {
+      return cachedQuote.data;
+    }
+    
     // Check if we're in development mode and should use mock data
     if (import.meta.env.DEV && (!FINNHUB_API_KEY || FINNHUB_API_KEY === 'your_api_key_here')) {
       console.log(`Using mock data for ${symbol} in development mode`);
-      return generateMockQuote(symbol);
+      const mockData = generateMockQuote(symbol);
+      
+      // Cache the mock data
+      cache.quotes[symbol] = {
+        data: mockData,
+        timestamp: Date.now()
+      };
+      
+      return mockData;
     }
     
-    const { data } = await finnhubClient.get<StockQuote>('/quote', {
-      params: { symbol }
+    // Make the API request with rate limiting
+    const data = await enqueueRequest(async () => {
+      const response = await finnhubClient.get<StockQuote>('/quote', {
+        params: { symbol }
+      });
+      return response.data;
     });
     
     if (!data || typeof data.c !== 'number') {
       console.error('Invalid quote data received:', data);
-      return generateMockQuote(symbol);
+      const mockData = generateMockQuote(symbol);
+      
+      // Cache the mock data
+      cache.quotes[symbol] = {
+        data: mockData,
+        timestamp: Date.now()
+      };
+      
+      return mockData;
     }
+    
+    // Cache the response
+    cache.quotes[symbol] = {
+      data,
+      timestamp: Date.now()
+    };
     
     return data;
   } catch (error) {
     console.error(`Error fetching quote for ${symbol}:`, error);
-    return generateMockQuote(symbol);
+    const mockData = generateMockQuote(symbol);
+    
+    // Cache the mock data
+    cache.quotes[symbol] = {
+      data: mockData,
+      timestamp: Date.now()
+    };
+    
+    return mockData;
   }
 };
 
@@ -126,14 +236,30 @@ const generateMockQuote = (symbol: string): StockQuote => {
 // Get company profile information
 export const getStockProfile = async (symbol: string): Promise<StockProfile | null> => {
   try {
-    const { data } = await finnhubClient.get<StockProfile>('/stock/profile2', {
-      params: { symbol }
+    // Check cache first
+    const cachedProfile = cache.profiles[symbol];
+    if (isCacheValid(cachedProfile)) {
+      return cachedProfile.data;
+    }
+    
+    // Make the API request with rate limiting
+    const data = await enqueueRequest(async () => {
+      const response = await finnhubClient.get<StockProfile>('/stock/profile2', {
+        params: { symbol }
+      });
+      return response.data;
     });
     
     if (!data || !data.name) {
       console.error('Invalid profile data received:', data);
       return null;
     }
+    
+    // Cache the response
+    cache.profiles[symbol] = {
+      data,
+      timestamp: Date.now()
+    };
     
     return data;
   } catch (error) {
@@ -150,24 +276,55 @@ export const getHistoricalData = async (
   to: number = Math.floor(Date.now() / 1000)
 ): Promise<HistoricalData | null> => {
   try {
-    const { data } = await finnhubClient.get<HistoricalData>('/stock/candle', {
-      params: {
-        symbol,
-        resolution,
-        from,
-        to
-      }
+    // Create a cache key that includes the parameters
+    const cacheKey = `${symbol}-${resolution}-${from}-${to}`;
+    
+    // Check cache first
+    const cachedData = cache.historical[cacheKey];
+    if (isCacheValid(cachedData)) {
+      return cachedData.data;
+    }
+    
+    // Make the API request with rate limiting
+    const data = await enqueueRequest(async () => {
+      const response = await finnhubClient.get<HistoricalData>('/stock/candle', {
+        params: { symbol, resolution, from, to }
+      });
+      return response.data;
     });
     
-    if (!data || data.s !== 'ok' || !data.c || data.c.length === 0) {
-      console.error('Invalid historical data received:', data);
-      return generateMockHistoricalData(30);
+    if (!data || data.s === 'no_data') {
+      console.error('No historical data available for', symbol);
+      const mockData = generateMockHistoricalData(30);
+      
+      // Cache the mock data
+      cache.historical[cacheKey] = {
+        data: mockData,
+        timestamp: Date.now()
+      };
+      
+      return mockData;
     }
+    
+    // Cache the response
+    cache.historical[cacheKey] = {
+      data,
+      timestamp: Date.now()
+    };
     
     return data;
   } catch (error) {
     console.error(`Error fetching historical data for ${symbol}:`, error);
-    return generateMockHistoricalData(30);
+    const mockData = generateMockHistoricalData(30);
+    
+    // Cache the mock data
+    const cacheKey = `${symbol}-${resolution}-${from}-${to}`;
+    cache.historical[cacheKey] = {
+      data: mockData,
+      timestamp: Date.now()
+    };
+    
+    return mockData;
   }
 };
 
@@ -216,8 +373,18 @@ export const searchStocks = async (query: string): Promise<StockSearchResult[]> 
       return [];
     }
     
-    const { data } = await finnhubClient.get<{ result: StockSearchResult[] }>('/search', {
-      params: { q: query }
+    // Check cache first
+    const cachedResults = cache.search[query];
+    if (isCacheValid(cachedResults)) {
+      return cachedResults.data;
+    }
+    
+    // Make the API request with rate limiting
+    const data = await enqueueRequest(async () => {
+      const response = await finnhubClient.get<{ result: StockSearchResult[] }>('/search', {
+        params: { q: query }
+      });
+      return response.data;
     });
     
     if (!data || !data.result || !Array.isArray(data.result)) {
@@ -226,12 +393,28 @@ export const searchStocks = async (query: string): Promise<StockSearchResult[]> 
     }
     
     // Filter out non-stock results and limit to 10 results
-    return data.result
+    const results = data.result
       .filter(item => item.type === 'Common Stock')
       .slice(0, 10);
+    
+    // Cache the results
+    cache.search[query] = {
+      data: results,
+      timestamp: Date.now()
+    };
+    
+    return results;
   } catch (error) {
     console.error(`Error searching for stocks with query "${query}":`, error);
-    return generateMockSearchResults(query);
+    const mockResults = generateMockSearchResults(query);
+    
+    // Cache the mock results
+    cache.search[query] = {
+      data: mockResults,
+      timestamp: Date.now()
+    };
+    
+    return mockResults;
   }
 };
 
@@ -277,35 +460,42 @@ export const getBatchQuotes = async (symbols: string[]): Promise<Record<string, 
   
   const results: Record<string, Quote> = {};
   
-  // Process in batches to avoid rate limiting
-  const batchSize = 5;
-  const batches = Math.ceil(symbols.length / batchSize);
+  // Check cache first for all symbols
+  const uncachedSymbols = symbols.filter(symbol => !isCacheValid(cache.quotes[symbol]));
+  
+  // Add cached results to the output
+  symbols.forEach(symbol => {
+    const cachedQuote = cache.quotes[symbol];
+    if (isCacheValid(cachedQuote)) {
+      results[symbol] = {
+        c: cachedQuote.data.c,
+        d: cachedQuote.data.d,
+        dp: cachedQuote.data.dp
+      };
+    }
+  });
+  
+  // Process uncached symbols in smaller batches
+  const batches = Math.ceil(uncachedSymbols.length / BATCH_SIZE);
   
   for (let i = 0; i < batches; i++) {
-    const batchSymbols = symbols.slice(i * batchSize, (i + 1) * batchSize);
-    const batchPromises = batchSymbols.map(async symbol => {
-      try {
-        const quote = await getStockQuote(symbol);
-        if (quote) {
-          results[symbol] = {
-            c: quote.c,
-            d: quote.d,
-            dp: quote.dp
-          };
-        }
-      } catch (error) {
-        console.error(`Error fetching quote for ${symbol} in batch:`, error);
-        // Use mock data as fallback
-        const mockQuote = generateMockQuote(symbol);
+    const batchSymbols = uncachedSymbols.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+    const batchPromises = batchSymbols.map(symbol => getStockQuote(symbol));
+    
+    // Wait for all quotes in this batch
+    const quotes = await Promise.all(batchPromises);
+    
+    // Add results to the output
+    batchSymbols.forEach((symbol, index) => {
+      const quote = quotes[index];
+      if (quote) {
         results[symbol] = {
-          c: mockQuote.c,
-          d: mockQuote.d,
-          dp: mockQuote.dp
+          c: quote.c,
+          d: quote.d,
+          dp: quote.dp
         };
       }
     });
-    
-    await Promise.all(batchPromises);
   }
   
   return results;

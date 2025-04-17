@@ -12,6 +12,8 @@ import {
   getTransactions,
   getUserTransactions,
   getTransactionStats,
+  getPortfolioHistory,
+  calculatePerformanceMetrics,
   calculateProfitLoss as getProfitLossData, // Rename the imported function
   PortfolioHolding,
   PortfolioSummary,
@@ -74,6 +76,11 @@ interface FinanceContextType {
   
   // Performance data
   performanceData: PerformanceData;
+  performanceMetrics: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
   
   // Sector data
   sectorData: SectorData[];
@@ -150,6 +157,11 @@ const FinanceContext = createContext<FinanceContextType>({
   },
   watchlist: [],
   performanceData: generatePerformanceData(),
+  performanceMetrics: {
+    daily: 0,
+    weekly: 0,
+    monthly: 0
+  },
   sectorData: [],
   transactions: [],
   transactionStats: {
@@ -218,6 +230,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     netProfitLoss: 0,
     profitLossPercentage: 0,
     sectorProfitLoss: []
+  });
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    daily: 0,
+    weekly: 0,
+    monthly: 0
   });
 
   // Listen for auth changes
@@ -479,6 +496,83 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setPortfolioSummary(summaryData);
       setLoadingSummary(false);
       
+      // Generate sector data from holdings
+      const sectorsData = generateSectorData(holdingsData.map(h => ({
+        id: h.id,
+        symbol: h.symbol,
+        name: h.name,
+        price: h.price,
+        change: h.change,
+        changePercent: h.changePercent,
+        volume: 0,
+        marketCap: 0,
+        sector: h.sector || 'Unknown',
+        quantity: h.quantity,
+        averageCost: h.averageCost,
+        value: h.value,
+        profit: h.profit,
+        profitPercent: h.profitPercent,
+        color: '',
+      })));
+      setSectorData(sectorsData);
+      
+      // Fetch real portfolio history data
+      const historyData = await getPortfolioHistory();
+      if (historyData) {
+        // Calculate performance metrics from the most recent data points
+        const dailyData = historyData.daily;
+        const weeklyData = historyData.weekly;
+        const monthlyData = historyData.monthly;
+        
+        // Calculate metrics based on the first and last data points
+        const calculateMetric = (data: HistoricalData[]): number => {
+          if (data.length < 2) return 0;
+          const oldest = data[0].value;
+          const newest = data[data.length - 1].value;
+          return newest - oldest;
+        };
+        
+        const dailyChange = calculateMetric(dailyData);
+        const weeklyChange = calculateMetric(weeklyData);
+        const monthlyChange = calculateMetric(monthlyData);
+        
+        // Only use the calculated value if it's non-zero
+        // Otherwise, keep the value calculated from the actual data
+        
+        // Create data objects for the performance metrics display
+        const dailyMetricData = [{ date: 'Today', value: dailyChange }];
+        const weeklyMetricData = [{ date: 'This Week', value: weeklyChange }];
+        const monthlyMetricData = [{ date: 'This Month', value: monthlyChange }];
+        
+        // Set the performance data
+        setPerformanceData({
+          daily: dailyData,
+          weekly: weeklyData,
+          monthly: monthlyData,
+          dailyMetric: dailyMetricData,
+          weeklyMetric: weeklyMetricData,
+          monthlyMetric: monthlyMetricData
+        });
+        
+        // Set performance metrics
+        setPerformanceMetrics({
+          daily: dailyChange,
+          weekly: weeklyChange,
+          monthly: monthlyChange
+        });
+        
+        // Update portfolio summary with the correct change values
+        if (summaryData) {
+          const updatedSummary = {
+            ...summaryData,
+            dailyChange: dailyChange,
+            dailyChangePercent: dailyData.length > 1 ? 
+              (dailyChange / dailyData[0].value) * 100 : 0
+          };
+          setPortfolioSummary(updatedSummary);
+        }
+      }
+      
       // Only refresh watchlist if it's been more than 5 minutes
       if (force || !lastUpdated || (now.getTime() - lastUpdated.getTime() > CACHE_DURATION)) {
         setLoadingWatchlist(true);
@@ -486,10 +580,6 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         setWatchlist(watchlistData);
         setLoadingWatchlist(false);
       }
-      
-      // Generate derived data from holdings
-      const sectorsData = generateSectorData(adaptHoldingsToStockData(holdingsData));
-      setSectorData(sectorsData);
       
       // Fetch transaction data
       setLoadingTransactions(true);
@@ -503,8 +593,6 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Calculate profit/loss data
       const profitLossData = await calculateProfitLoss();
       setProfitLossData(profitLossData);
-      
-      setLastUpdated(now);
     } catch (error) {
       console.error('Error refreshing data:', error);
       toast({
@@ -801,6 +889,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       portfolioSummary: portfolioSummary || defaultPortfolioSummary,
       watchlist,
       performanceData: performanceData || generatePerformanceData(),
+      performanceMetrics,
       sectorData,
       transactions,
       transactionStats,

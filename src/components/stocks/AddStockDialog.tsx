@@ -45,7 +45,9 @@ const AddStockDialog: React.FC<AddStockDialogProps> = ({
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<StockSearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('search');
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const quantityInputRef = useRef<HTMLInputElement>(null);
   
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -98,10 +100,33 @@ const AddStockDialog: React.FC<AddStockDialogProps> = ({
     setSelectedStock(stock);
     setSuggestions([]);
     setShowSuggestions(false);
+    
+    // Automatically perform search when suggestion is selected
+    setSearchResults([stock]);
+    
+    // Automatically move to the manual tab for quantity input
+    setActiveTab('manual');
+    
+    // Focus on quantity input
+    setTimeout(() => {
+      if (quantityInputRef.current) {
+        quantityInputRef.current.focus();
+      }
+    }, 100);
   };
   
   const handleStockSelect = (stock: StockSearchResult) => {
     setSelectedStock(stock);
+    
+    // Automatically move to the manual tab for quantity input
+    setActiveTab('manual');
+    
+    // Focus on quantity input
+    setTimeout(() => {
+      if (quantityInputRef.current) {
+        quantityInputRef.current.focus();
+      }
+    }, 100);
   };
   
   const handleAddPortfolio = async () => {
@@ -167,7 +192,7 @@ const AddStockDialog: React.FC<AddStockDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="search" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="search">Search</TabsTrigger>
             <TabsTrigger value="manual">Manual Entry</TabsTrigger>
@@ -276,6 +301,7 @@ const AddStockDialog: React.FC<AddStockDialogProps> = ({
                         step="1"
                         value={quantity || ''}
                         onChange={(e) => setQuantity(Number(e.target.value))}
+                        ref={quantityInputRef}
                       />
                     </div>
                     <div className="space-y-2">

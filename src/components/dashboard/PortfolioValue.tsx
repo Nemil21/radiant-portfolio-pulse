@@ -5,6 +5,7 @@ import { Line } from 'recharts';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { ChevronUp, ChevronDown, Wallet } from 'lucide-react';
 import { HistoricalData } from '@/data/mockData';
+import { format } from 'date-fns';
 
 interface PortfolioValueProps {
   totalValue: number;
@@ -30,9 +31,20 @@ const PortfolioValue: React.FC<PortfolioValueProps> = ({
   
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      // Format the date to be more readable
+      const dateStr = payload[0].payload.date;
+      let formattedDate = dateStr;
+      
+      try {
+        const date = new Date(dateStr);
+        formattedDate = format(date, 'MMM d, yyyy');
+      } catch (e) {
+        console.error('Error formatting date:', e);
+      }
+      
       return (
         <div className="glass p-3 text-xs">
-          <p className="text-white">{`${payload[0].payload.date}`}</p>
+          <p className="text-white">{formattedDate}</p>
           <p className="text-finance-teal font-bold">{formatCurrency(payload[0].value)}</p>
         </div>
       );
@@ -55,14 +67,14 @@ const PortfolioValue: React.FC<PortfolioValueProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             {totalProfit >= 0 ? (
-              <div className="bg-finance-profit/20 text-finance-profit px-2 py-0.5 rounded-md flex items-center text-sm">
+              <div className="bg-finance-profit/20 text-finance-profit px-2 py-1 rounded-md flex items-center text-sm">
                 <ChevronUp className="h-4 w-4 mr-1" />
                 {formatCurrency(totalProfit)} (+{totalProfitPercent.toFixed(2)}%)
               </div>
             ) : (
-              <div className="bg-finance-loss/20 text-finance-loss px-2 py-0.5 rounded-md flex items-center text-sm">
+              <div className="bg-finance-loss/20 text-finance-loss px-2 py-1 rounded-md flex items-center text-sm">
                 <ChevronDown className="h-4 w-4 mr-1" />
-                {formatCurrency(Math.abs(totalProfit))} ({totalProfitPercent.toFixed(2)}%)
+                {formatCurrency(totalProfit)} ({totalProfitPercent.toFixed(2)}%)
               </div>
             )}
           </div>
@@ -79,16 +91,23 @@ const PortfolioValue: React.FC<PortfolioValueProps> = ({
               </defs>
               <XAxis 
                 dataKey="date" 
-                hide={true} 
+                hide={true}
+                domain={['dataMin', 'dataMax']}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip 
+                content={<CustomTooltip />}
+                isAnimationActive={false}
+              />
               <Area 
                 type="monotone" 
                 dataKey="value" 
                 stroke="#2dd4bf" 
                 strokeWidth={2}
                 fillOpacity={1}
-                fill="url(#colorValue)" 
+                fill="url(#colorValue)"
+                isAnimationActive={true}
+                animationDuration={1000}
+                animationEasing="ease-in-out"
               />
             </AreaChart>
           </ResponsiveContainer>

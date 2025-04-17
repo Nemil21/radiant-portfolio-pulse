@@ -28,7 +28,10 @@ export interface PerformanceData {
   daily: HistoricalData[];
   weekly: HistoricalData[];
   monthly: HistoricalData[];
-  yearly: HistoricalData[];
+  // Metrics for display
+  dailyMetric?: HistoricalData[];
+  weeklyMetric?: HistoricalData[];
+  monthlyMetric?: HistoricalData[];
 }
 
 export interface SectorData {

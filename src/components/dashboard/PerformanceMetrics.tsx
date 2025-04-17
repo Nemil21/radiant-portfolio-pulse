@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PerformanceData } from '@/data/mockData';
 import { Skeleton } from '@/components/ui/skeleton';
+import PerformanceChart from './PerformanceChart';
 
 interface PerformanceMetricsProps {
   performanceData: PerformanceData;
@@ -58,35 +59,32 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-secondary/20">
               <p className="text-xs text-muted-foreground mb-1">Daily Change</p>
-              <p className={`text-xl font-semibold ${performanceData.daily[performanceData.daily.length - 1].value >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
-                {formatCurrency(performanceData.daily[performanceData.daily.length - 1].value)}
+              <p className={`text-xl font-semibold ${(performanceData.dailyMetric?.[0]?.value || 0) >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
+                {formatCurrency(performanceData.dailyMetric?.[0]?.value || 0)}
               </p>
             </div>
             <div className="p-4 rounded-lg bg-secondary/20">
               <p className="text-xs text-muted-foreground mb-1">Weekly Change</p>
-              <p className={`text-xl font-semibold ${performanceData.weekly[performanceData.weekly.length - 1].value >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
-                {formatCurrency(performanceData.weekly[performanceData.weekly.length - 1].value)}
+              <p className={`text-xl font-semibold ${(performanceData.weeklyMetric?.[0]?.value || 0) >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
+                {formatCurrency(performanceData.weeklyMetric?.[0]?.value || 0)}
               </p>
             </div>
             <div className="p-4 rounded-lg bg-secondary/20">
               <p className="text-xs text-muted-foreground mb-1">Monthly Change</p>
-              <p className={`text-xl font-semibold ${performanceData.monthly[performanceData.monthly.length - 1].value >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
-                {formatCurrency(performanceData.monthly[performanceData.monthly.length - 1].value)}
+              <p className={`text-xl font-semibold ${(performanceData.monthlyMetric?.[0]?.value || 0) >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
+                {formatCurrency(performanceData.monthlyMetric?.[0]?.value || 0)}
               </p>
             </div>
             <div className="p-4 rounded-lg bg-secondary/20">
               <p className="text-xs text-muted-foreground mb-1">Yearly Change</p>
-              <p className={`text-xl font-semibold ${performanceData.yearly[performanceData.yearly.length - 1].value >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
-                {formatCurrency(performanceData.yearly[performanceData.yearly.length - 1].value)}
+              <p className={`text-xl font-semibold ${(performanceData.yearlyMetric?.[0]?.value || 0) >= 0 ? 'text-finance-profit' : 'text-finance-loss'}`}>
+                {formatCurrency(performanceData.yearlyMetric?.[0]?.value || 0)}
               </p>
             </div>
           </div>
           
-          <div className="mt-6 h-[200px] bg-secondary/10 rounded-lg p-4 flex items-center justify-center">
-            <div className="text-center text-muted-foreground">
-              <p>Performance Chart</p>
-              <p className="text-xs">Coming soon</p>
-            </div>
+          <div className="mt-6">
+            <PerformanceChart data={performanceData} />
           </div>
         </div>
       </CardContent>
